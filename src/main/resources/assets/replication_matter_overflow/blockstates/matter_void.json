@@ -1,0 +1,19 @@
+{
+  "variants": {
+	"subfacing=east": {
+	  "model": "replication_matter_overflow:block/matter_void",
+	  "y": 90
+	},
+	"subfacing=north": {
+	  "model": "replication_matter_overflow:block/matter_void"
+	},
+	"subfacing=south": {
+	  "model": "replication_matter_overflow:block/matter_void",
+	  "y": 180
+	},
+	"subfacing=west": {
+	  "model": "replication_matter_overflow:block/matter_void",
+	  "y": 270
+	}
+  }
+}

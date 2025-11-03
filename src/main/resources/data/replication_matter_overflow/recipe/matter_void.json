@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "G": {
+      "tag": "c:glass_blocks"
+    },
+    "I": {
+      "item": "replication:replica_ingot"
+    },
+    "O": {
+      "tag": "c:obsidian"
+    }
+  },
+  "pattern": [
+    "IGI",
+    "GOG",
+    "IGI"
+  ],
+  "result": {
+    "count": 1,
+    "id": "replication_matter_overflow:matter_void"
+  }
+}
