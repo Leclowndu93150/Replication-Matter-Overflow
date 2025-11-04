@@ -63,6 +63,7 @@ public class ReplicationMatterOverflow {
         
         modEventBus.addListener(this::clientSetup);
         modEventBus.addListener(this::registerCapabilities);
+        modEventBus.addListener(ClientEvents::registerRenderers);
     }
     
     private void clientSetup(FMLClientSetupEvent event) {

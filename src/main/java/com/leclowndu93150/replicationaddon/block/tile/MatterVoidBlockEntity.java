@@ -99,21 +99,46 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
     }
 
     public static class VoidingMatterTankComponent<T extends IComponentHarness> extends MatterTankComponent<T> {
+        
+        private static final double MAX_DISPLAY_AMOUNT = 255999;
 
         public VoidingMatterTankComponent(String name, int amount, int posX, int posY) {
             super(name, amount, posX, posY);
         }
 
         @Override
+        public double getMatterAmount() {
+            return Math.min(super.getMatterAmount(), MAX_DISPLAY_AMOUNT);
+        }
+
+        @Override
         public double fill(MatterStack resource, IFluidHandler.FluidAction action) {
-            if (getTankAction().canFill() && getInsertPredicate().test(resource)) {
-                double filled = super.fill(resource, action);
-                if (filled < resource.getAmount()) {
-                    return resource.getAmount();
-                }
-                return filled;
+            if (!getInsertPredicate().test(resource) || resource.isEmpty()) {
+                return 0;
             }
-            return 0;
+            if (!isMatterValid(resource)) {
+                return 0;
+            }
+            if (action.simulate()) {
+                return resource.getAmount();
+            }
+            if (getMatter().isEmpty()) {
+                double toStore = Math.min(MAX_DISPLAY_AMOUNT, resource.getAmount());
+                setMatter(new MatterStack(resource, toStore));
+                onContentsChanged();
+                return resource.getAmount();
+            }
+            if (!getMatter().isMatterEqual(resource)) {
+                return 0;
+            }
+            double actualAmount = super.getMatterAmount();
+            double spaceAvailable = MAX_DISPLAY_AMOUNT - actualAmount;
+            if (spaceAvailable > 0) {
+                double toAdd = Math.min(spaceAvailable, resource.getAmount());
+                getMatter().grow(toAdd);
+                onContentsChanged();
+            }
+            return resource.getAmount();
         }
     }
 }

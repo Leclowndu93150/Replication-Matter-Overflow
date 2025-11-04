@@ -101,6 +101,7 @@ sourceSets.main.resources { srcDir 'src/generated/resources' }
 dependencies {
     implementation "curse.maven:replication-638351:6941700"
     implementation "curse.maven:titanium-287342:6875285"
+    implementation "curse.maven:functional-storage-556861:7061714"
 }
 
 // This block of code expands all declared replace properties in the specified resource targets.

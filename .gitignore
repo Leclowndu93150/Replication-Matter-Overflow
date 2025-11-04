@@ -5,6 +5,8 @@
 *.ipr
 *.iws
 .claude
+Replication-1.21
+Titanium-1.21
 
 # IntelliJ
 out/
