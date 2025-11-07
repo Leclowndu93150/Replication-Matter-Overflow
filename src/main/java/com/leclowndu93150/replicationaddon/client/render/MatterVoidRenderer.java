@@ -27,7 +27,6 @@ public class MatterVoidRenderer<T extends MatterVoidBlockEntity> implements Bloc
     public void render(T tile, float v, PoseStack poseStack, MultiBufferSource multiBufferSource, int combinedLightIn, int combinedOverlayIn) {
         var padding = 0.2;
         var matterStack = tile.getTanks().get(0).getMatter();
-        System.out.println("MatterVoidRenderer.render() called - isEmpty: " + matterStack.isEmpty() + ", amount: " + matterStack.getAmount());
         if (!matterStack.isEmpty())
             renderFaces(poseStack, multiBufferSource, new AABB(padding, 0.255, padding, 1 - padding, 0.255 + (matterStack.getAmount() / (double) tile.getTanks().get(0).getCapacity()) * 0.5, 1 - padding), LightTexture.FULL_BRIGHT, combinedOverlayIn, matterStack.getMatterType());
     }
