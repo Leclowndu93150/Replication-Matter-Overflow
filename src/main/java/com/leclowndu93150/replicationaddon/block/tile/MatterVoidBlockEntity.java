@@ -16,6 +16,8 @@ import com.hrznstudio.titanium.block.BasicTileBlock;
 import com.hrznstudio.titanium.client.screen.asset.IAssetProvider;
 import com.hrznstudio.titanium.component.IComponentHarness;
 import com.hrznstudio.titanium.component.fluid.FluidTankComponent;
+import com.leclowndu93150.replicationaddon.component.TankPriorityButtonHelper;
+import com.leclowndu93150.replicationaddon.component.TankPriorityHolder;
 import com.leclowndu93150.replicationaddon.registry.ModRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -31,10 +33,12 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
-public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEntity> implements IMatterTanksSupplier, IMatterTanksConsumer {
+public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEntity> implements IMatterTanksSupplier, IMatterTanksConsumer, TankPriorityHolder {
 
     @Save
     private LockableMatterTankBundle<MatterVoidBlockEntity> lockableMatterTankBundle;
+    @Save
+    private int tankPriority;
     private IMatterType cachedType = MatterType.EMPTY;
 
     public MatterVoidBlockEntity(BasicTileBlock<MatterVoidBlockEntity> base, BlockEntityType<?> blockEntityType, BlockPos pos, BlockState state) {
@@ -44,6 +48,7 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
         this.lockableMatterTankBundle = new LockableMatterTankBundle<>(this, tank, 78 + 20, 28, false);
         this.addBundle(lockableMatterTankBundle);
         this.addMatterTank(this.lockableMatterTankBundle.getTank());
+        TankPriorityButtonHelper.addPriorityButtons(this, this, 98, 28);
     }
 
     private void onTankContentChange(){
@@ -67,6 +72,22 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
     @Override
     public List<? extends IMatterTank> getTanks() {
         return this.getMatterTankComponents();
+    }
+
+    @Override
+    public int getTankPriority() {
+        return this.tankPriority;
+    }
+
+    @Override
+    public void setTankPriority(int priority) {
+        int clamped = TankPriorityHolder.super.clampPriority(priority);
+        if (clamped == this.tankPriority) {
+            return;
+        }
+        this.tankPriority = clamped;
+        syncObject(this.tankPriority);
+        markForUpdate();
     }
 
     @NotNull
