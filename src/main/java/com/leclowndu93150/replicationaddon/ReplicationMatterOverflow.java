@@ -1,5 +1,6 @@
 package com.leclowndu93150.replicationaddon;
 
+import com.buuz135.replication.block.MatterPipeBlock;
 import com.leclowndu93150.replicationaddon.client.ClientEvents;
 import com.leclowndu93150.replicationaddon.registry.ModRegistry;
 import com.mojang.logging.LogUtils;
@@ -64,6 +65,8 @@ public class ReplicationMatterOverflow {
         modEventBus.addListener(this::clientSetup);
         modEventBus.addListener(this::registerCapabilities);
         modEventBus.addListener(ClientEvents::registerRenderers);
+
+        MatterPipeBlock.ALLOWED_CONNECTION_BLOCKS.add(block -> block == ModRegistry.MATTER_VOID.get());
     }
     
     private void clientSetup(FMLClientSetupEvent event) {

@@ -12,52 +12,82 @@ import com.buuz135.replication.block.tile.NetworkBlockEntity;
 import com.buuz135.replication.client.gui.ReplicationAddonProvider;
 import com.buuz135.replication.container.component.LockableMatterTankBundle;
 import com.hrznstudio.titanium.annotation.Save;
+import com.hrznstudio.titanium.Titanium;
 import com.hrznstudio.titanium.block.BasicTileBlock;
+import com.hrznstudio.titanium.client.screen.addon.WidgetScreenAddon;
 import com.hrznstudio.titanium.client.screen.asset.IAssetProvider;
+import com.hrznstudio.titanium.network.locator.ILocatable;
+import com.hrznstudio.titanium.network.messages.ButtonClickNetworkMessage;
+import com.hrznstudio.titanium.util.AssetUtil;
 import com.hrznstudio.titanium.component.IComponentHarness;
 import com.hrznstudio.titanium.component.fluid.FluidTankComponent;
-import com.leclowndu93150.replicationaddon.component.TankPriorityButtonHelper;
-import com.leclowndu93150.replicationaddon.component.TankPriorityHolder;
 import com.leclowndu93150.replicationaddon.registry.ModRegistry;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.function.BooleanSupplier;
 
-public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEntity> implements IMatterTanksSupplier, IMatterTanksConsumer, TankPriorityHolder {
+public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEntity> implements IMatterTanksSupplier, IMatterTanksConsumer {
 
     @Save
     private LockableMatterTankBundle<MatterVoidBlockEntity> lockableMatterTankBundle;
     @Save
     private int tankPriority;
+
     private IMatterType cachedType = MatterType.EMPTY;
 
     public MatterVoidBlockEntity(BasicTileBlock<MatterVoidBlockEntity> base, BlockEntityType<?> blockEntityType, BlockPos pos, BlockState state) {
         super(base, blockEntityType != null ? blockEntityType : ModRegistry.MATTER_VOID_BE.get(), pos, state);
-        VoidingMatterTankComponent<MatterVoidBlockEntity> tank = new VoidingMatterTankComponent<>("tank", ReplicationConfig.MatterTank.CAPACITY, 78, 28);
+        VoidingMatterTankComponent<MatterVoidBlockEntity> tank = new VoidingMatterTankComponent<>("tank", ReplicationConfig.MatterTank.CAPACITY, 32, 28, () -> true);
         tank.setTankAction(FluidTankComponent.Action.BOTH).setOnContentChange(this::onTankContentChange);
-        this.lockableMatterTankBundle = new LockableMatterTankBundle<>(this, tank, 78 + 20, 28, false);
+        this.lockableMatterTankBundle = new LockableMatterTankBundle<>(this, tank, 32 - 16, 30, false);
         this.addBundle(lockableMatterTankBundle);
         this.addMatterTank(this.lockableMatterTankBundle.getTank());
-        TankPriorityButtonHelper.addPriorityButtons(this, this, 98, 28);
+        this.tankPriority = 0;
     }
 
-    private void onTankContentChange(){
+    private void onTankContentChange() {
         syncObject(this.lockableMatterTankBundle);
         this.getNetwork().onTankValueChanged(cachedType);
         if (!cachedType.equals(this.lockableMatterTankBundle.getTank().getMatter().getMatterType())) {
             this.cachedType = this.lockableMatterTankBundle.getTank().getMatter().getMatterType();
             this.getNetwork().onTankValueChanged(cachedType);
         }
+    }
+
+    @Override
+    public void handleButtonMessage(int id, Player playerEntity, CompoundTag compound) {
+        super.handleButtonMessage(id, playerEntity, compound);
+        if (id == 124578) {
+            this.tankPriority = compound.getInt("Priority");
+            syncObject(this.tankPriority);
+        }
+        markComponentDirty();
+    }
+
+    @OnlyIn(Dist.CLIENT)
+    @Override
+    public void initClient() {
+        super.initClient();
+        this.addGuiAddonFactory(() -> new VoidTankPriorityAddon(this, 32 + 20 + 1, 34 + 18));
     }
 
     @Override
@@ -75,19 +105,8 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
     }
 
     @Override
-    public int getTankPriority() {
+    public int getPriority() {
         return this.tankPriority;
-    }
-
-    @Override
-    public void setTankPriority(int priority) {
-        int clamped = TankPriorityHolder.super.clampPriority(priority);
-        if (clamped == this.tankPriority) {
-            return;
-        }
-        this.tankPriority = clamped;
-        syncObject(this.tankPriority);
-        markForUpdate();
     }
 
     @NotNull
@@ -123,8 +142,8 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
         
         private static final double MAX_DISPLAY_AMOUNT = 255999;
 
-        public VoidingMatterTankComponent(String name, int amount, int posX, int posY) {
-            super(name, amount, posX, posY);
+        public VoidingMatterTankComponent(String name, int amount, int posX, int posY, BooleanSupplier voidExcessSupplier) {
+            super(name, amount, posX, posY, voidExcessSupplier, () -> false);
         }
 
         @Override
@@ -160,6 +179,84 @@ public class MatterVoidBlockEntity extends NetworkBlockEntity<MatterVoidBlockEnt
                 onContentsChanged();
             }
             return resource.getAmount();
+        }
+    }
+
+    public static class VoidTankPriorityAddon extends WidgetScreenAddon {
+
+        private final MatterVoidBlockEntity blockEntity;
+        private final EditBox editBox;
+        private String lastValue;
+
+        public VoidTankPriorityAddon(MatterVoidBlockEntity blockEntity, int posX, int posY) {
+            super(posX, posY, new EditBox(Minecraft.getInstance().font, 85, 20, 160, 26, Component.translatable("tooltip.replication.tank.insert_priority")));
+            this.blockEntity = blockEntity;
+            this.lastValue = "";
+            this.editBox = (EditBox) getWidget();
+            this.editBox.setValue(blockEntity.getPriority() + "");
+            this.editBox.setFilter(s -> {
+                if (s.isEmpty()) return true;
+                if (s.charAt(0) == '-') return true;
+                try {
+                    Integer.parseInt(s);
+                    return true;
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            });
+            this.editBox.setMaxLength(6);
+            this.editBox.setBordered(false);
+            this.editBox.setVisible(true);
+            this.editBox.setTextColor(0x72e567);
+        }
+
+        @Override
+        public int getXSize() {
+            return 0;
+        }
+
+        @Override
+        public int getYSize() {
+            return 0;
+        }
+
+        @Override
+        public void drawBackgroundLayer(GuiGraphics guiGraphics, Screen screen, IAssetProvider iAssetProvider, int guiX, int guiY, int mouseX, int mouseY, float partialTicks) {
+            this.editBox.setResponder(s -> {
+                if (s.isEmpty()) return;
+                if (!this.lastValue.equals(s) && screen instanceof AbstractContainerScreen<?> containerScreen && containerScreen.getMenu() instanceof ILocatable locatable) {
+                    var compound = new CompoundTag();
+                    if (s.charAt(0) == '-' && s.length() == 1) {
+                        compound.putInt("Priority", -0);
+                    } else {
+                        compound.putInt("Priority", Integer.parseInt(s));
+                    }
+                    Titanium.NETWORK.sendToServer(new ButtonClickNetworkMessage(locatable.getLocatorInstance(), 124578, compound));
+                    new Thread(() -> {
+                        try {
+                            Thread.sleep(5000);
+                            this.editBox.setValue(blockEntity.getPriority() + "");
+                        } catch (InterruptedException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }).start();
+                }
+                this.lastValue = s;
+            });
+            super.drawBackgroundLayer(guiGraphics, screen, iAssetProvider, guiX, guiY, mouseX, mouseY, partialTicks);
+            var textWidth = Minecraft.getInstance().font.width(Component.translatable("tooltip.replication.tank.priority").getString());
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.translatable("tooltip.replication.tank.priority"), guiX + this.getPosX(), guiY + this.getPosY(), 0x72e567, false);
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(textWidth, 0, 0);
+            this.editBox.render(guiGraphics, mouseX, mouseY, partialTicks);
+            guiGraphics.pose().popPose();
+            for (int i = 0; i < 18; i++) {
+                AssetUtil.drawHorizontalLine(guiGraphics, guiX + this.getPosX() + textWidth + i * 2, guiX + this.getPosX() + textWidth + i * 2, guiY + this.getPosY() + 8, 0xff72e567);
+            }
+        }
+
+        @Override
+        public void drawForegroundLayer(GuiGraphics guiGraphics, Screen screen, IAssetProvider iAssetProvider, int guiX, int guiY, int mouseX, int mouseY, float partialTicks) {
         }
     }
 }
